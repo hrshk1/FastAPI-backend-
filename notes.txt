@@ -1,0 +1,8 @@
+first initialise a virtual environment otherwise fastapi will be installed globally and may cause conflicts with other projects. also activate the virtual environment, for activating run .\myenv\Scripts\Activate.ps1 
+
+if we want to do data validation in FastAPI, we can use Pydantic models. 
+
+use localhost:8000/docs to directly access the Swagger UI documentation for the FastAPI application. This interface allows you to interact with the API endpoints, test requests, and view responses in a user-friendly manner.
+
+
+we use sqlalchemy to interact with the database. It provides an ORM (Object Relational Mapping) layer that creates a row for every object in the database, allowing us to work with Python objects instead of writing raw SQL queries.
