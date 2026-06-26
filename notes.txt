@@ -6,3 +6,9 @@ use localhost:8000/docs to directly access the Swagger UI documentation for the 
 
 
 we use sqlalchemy to interact with the database. It provides an ORM (Object Relational Mapping) layer that creates a row for every object in the database, allowing us to work with Python objects instead of writing raw SQL queries.
+
+
+https://chatgpt.com/share/6a3e1c4d-b7d0-83ee-80d8-52db7432b801
+
+
+when req is sent from frontend to backend, first data is validated using pydantic models, then the data is sent to the database using sqlalchemy. so both are necessary for the project.
