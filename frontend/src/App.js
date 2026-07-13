@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useCallback, useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import "./App.css";
 import TaglineSection from "./TaglineSection";
-
+import { GoogleLogin, googleLogout } from "@react-oauth/google";
 const api = axios.create({
   baseURL: "http://localhost:8000",
 });
@@ -23,6 +23,8 @@ function App() {
   const [filter, setFilter] = useState("");
   const [sortField, setSortField] = useState("id");
   const [sortDirection, setSortDirection] = useState("asc");
+  const [user, setUser] = useState(null);
+  const [authToken, setAuthToken] = useState("");
 
   // Auto-dismiss messages after 5 seconds
   useEffect(() => {
@@ -43,34 +45,32 @@ function App() {
     }
   }, [error]);
 
+  const authConfig = useCallback(
+    () => ({
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+    }),
+    [authToken]
+  );
+
   // Fetch all products
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
+    if (!authToken) return;
     setLoading(true);
     try {
-      const res = await api.get("/products");
+      const res = await api.get("/products", authConfig());
       setProducts(res.data);
       setError("");
     } catch (err) {
       setError("Failed to fetch products");
     }
     setLoading(false);
-  };
+  }, [authConfig, authToken]);
 
   useEffect(() => {
-    // Inline initial fetch to avoid referencing external deps
-    const run = async () => {
-      setLoading(true);
-      try {
-        const res = await api.get("/products");
-        setProducts(res.data);
-        setError("");
-      } catch (err) {
-        setError("Failed to fetch products");
-      }
-      setLoading(false);
-    };
-    run();
-  }, []);
+    fetchProducts();
+  }, [fetchProducts]);
 
   // Handle sorting
   const handleSort = (field) => {
@@ -97,7 +97,7 @@ function App() {
     }
     
     // Apply sorting
-    return filtered.sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       let aVal = a[sortField];
       let bVal = b[sortField];
       
@@ -141,7 +141,7 @@ function App() {
           id: Number(form.id),
           price: Number(form.price),
           quantity: Number(form.quantity),
-        });
+        }, authConfig());
         setMessage("Product updated successfully");
       } else {
         await api.post("/products", {
@@ -149,7 +149,7 @@ function App() {
           id: Number(form.id),
           price: Number(form.price),
           quantity: Number(form.quantity),
-        });
+        }, authConfig());
         setMessage("Product created successfully");
       }
       resetForm();
@@ -182,7 +182,7 @@ function App() {
     setMessage("");
     setError("");
     try {
-      await api.delete(`/products/${id}`);
+      await api.delete(`/products/${id}`, authConfig());
       setMessage("Product deleted successfully");
       fetchProducts();
     } catch (err) {
@@ -194,6 +194,45 @@ function App() {
   const currency = (n) =>
     typeof n === "number" ? n.toFixed(2) : Number(n || 0).toFixed(2);
 
+  // crediential response is the object returned by Google login
+  const handleGoogleSuccess = async (credentialResponse) => {
+    try {
+      const token = credentialResponse.credential;
+      const res = await api.post("/auth/google", { token });
+      const session = { user: res.data, token };
+
+      setUser(session.user);
+      setAuthToken(session.token);
+      localStorage.setItem("authSession", JSON.stringify(session));
+      setError("");
+    } catch (err) {
+      setError("Google login failed");
+    }
+  };
+
+  const handleLogout = () => {
+    googleLogout();
+    setUser(null);
+    setAuthToken("");
+    setProducts([]);
+    resetForm();
+    localStorage.removeItem("authSession");
+  };
+
+  useEffect(() => {
+    const saved = localStorage.getItem("authSession");
+
+    if (saved) {
+      try {
+        const session = JSON.parse(saved);
+        setUser(session.user);
+        setAuthToken(session.token);
+      } catch (err) {
+        localStorage.removeItem("authSession");
+      }
+    }
+  }, []);
+
   return (
     <div className="app-bg">
       <header className="topbar">
@@ -202,12 +241,27 @@ function App() {
           <h1>Inventory Manager</h1>
         </div>
         <div className="top-actions">
-          <button className="btn btn-light" onClick={fetchProducts} disabled={loading}>
+          {!user ? (
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => setError("Login failed")}
+            />
+          ) : (
+            <button className="btn btn-secondary" onClick={handleLogout}>
+              Logout
+            </button>
+          )}
+
+          <button
+            className="btn btn-light"
+            onClick={fetchProducts}
+            disabled={loading || !user}
+          >
             Refresh
           </button>
         </div>
       </header>
-
+      {user ? (
       <div className="container">
         <div className="stats">
           <div className="chip">Total: {products.length}</div>
@@ -364,7 +418,13 @@ function App() {
             )}
           </div>
         </div>
-      </div>
+      </div>) : (
+        <div className="login-panel">
+          <h2>Sign in to manage inventory</h2>
+          <p>Products are available only after Google login.</p>
+          {error && <div className="error-msg">{error}</div>}
+        </div>
+      )}
     </div>
   );
 }

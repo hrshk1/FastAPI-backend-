@@ -1,4 +1,11 @@
-from fastapi import Depends, FastAPI
+import os
+import json
+import urllib.error
+import urllib.parse
+import urllib.request
+from typing import Optional
+
+from fastapi import Depends, FastAPI, Header, HTTPException
 #importing FastAPI class from fastapi module
 from models import Product
 #import Product class from models module
@@ -6,6 +13,7 @@ from database import session, engine
 import database_model
 from sqlalchemy.orm import Session #it is not the same session that we created in database. it is a class of orm for dependency injection 
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 #creating an instance/object of FastAPI class
 app = FastAPI()
@@ -16,6 +24,50 @@ app.add_middleware(
     allow_methods = ["*"],
     allow_headers = ["*"]
 )
+
+GOOGLE_CLIENT_ID = os.getenv(
+    "GOOGLE_CLIENT_ID",
+    "338970158695-mrgadrp7n37ndln288nmf96tocj8hjuk.apps.googleusercontent.com",
+)
+
+
+class GoogleToken(BaseModel):
+    token: str
+
+
+class GoogleUser(BaseModel):
+    email: str
+    name: Optional[str] = None
+    picture: Optional[str] = None
+
+
+def verify_google_token(token: str) -> GoogleUser:
+    params = urllib.parse.urlencode({"id_token": token})
+    url = f"https://oauth2.googleapis.com/tokeninfo?{params}"
+
+    try:
+        with urllib.request.urlopen(url, timeout=5) as response:
+            payload = response.read()
+    except (urllib.error.URLError, TimeoutError):
+        raise HTTPException(status_code=401, detail="Could not verify Google login")
+
+    data = json.loads(payload)
+    if GOOGLE_CLIENT_ID and data.get("aud") != GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=401, detail="Google login is for a different app")
+    if data.get("email_verified") != "true":
+        raise HTTPException(status_code=401, detail="Google email is not verified")
+
+    return GoogleUser(
+        email=data["email"],
+        name=data.get("name"),
+        picture=data.get("picture"),
+    )
+
+
+def get_current_user(authorization: Optional[str] = Header(default=None)) -> GoogleUser:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Login required")
+    return verify_google_token(authorization.removeprefix("Bearer ").strip())
 
 #create a table in the database using the metadata of the Product class defined in database_model.py
 database_model.Base.metadata.create_all(bind=engine)
@@ -62,23 +114,28 @@ def greet():
     return "Welcome to the server"
 
 
+@app.post("/auth/google")
+def google_auth(google_token: GoogleToken):
+    user = verify_google_token(google_token.token)
+    return user
+
 
 
 @app.get("/products")
-def get_products(db: Session =Depends(get_db)):
+def get_products(db: Session =Depends(get_db), user: GoogleUser = Depends(get_current_user)):
     db_products = db.query(database_model.Product).all()
     return db_products
 
 #get a single product by its ID
 @app.get("/products/{id}")
-def get_product_by_id(id:int,db:Session = Depends(get_db)):
+def get_product_by_id(id:int,db:Session = Depends(get_db), user: GoogleUser = Depends(get_current_user)):
     db_product = db.query(database_model.Product).filter(database_model.Product.id ==id).first()
     if db_product:
         return db_product
     return "product not found"
 
 @app.post("/products")
-def add_product(product: Product, db: Session = Depends(get_db)):
+def add_product(product: Product, db: Session = Depends(get_db), user: GoogleUser = Depends(get_current_user)):
     db_product = database_model.Product(**product.model_dump())
     db.add(db_product)
     db.commit()
@@ -87,7 +144,7 @@ def add_product(product: Product, db: Session = Depends(get_db)):
 
 #update a product by its ID
 @app.put("/products/{id}")
-def update_product(id:int, product:Product, db: Session = Depends(get_db)):
+def update_product(id:int, product:Product, db: Session = Depends(get_db), user: GoogleUser = Depends(get_current_user)):
     db_product = db.query(database_model.Product).filter(database_model.Product.id==id).first()
     if db_product:
         db_product.name= product.name
@@ -101,7 +158,7 @@ def update_product(id:int, product:Product, db: Session = Depends(get_db)):
     
 
 @app.delete("/products/{id}")
-def delete_product(id: int, db:Session = Depends(get_db)):
+def delete_product(id: int, db:Session = Depends(get_db), user: GoogleUser = Depends(get_current_user)):
     db_product = db.query(database_model.Product).filter(database_model.Product.id == id).first()
     if db_product:
         db.delete(db_product)

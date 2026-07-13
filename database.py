@@ -9,7 +9,7 @@ import os
 
 #db_url structure is as follows: "database_type://username:password@host:port/database_name"
 #make sure you have created a database named fastapi in your postgresql server before running the code below. You can create a database using pgAdmin or psql command line tool.
-db_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/fastapi")
+db_url = os.getenv("DATABASE_URL", "postgresql://postgres:hrshk1@localhost:5432/fastapi")
 engine = create_engine(db_url)
 
 #always make autocommit and autoflush to false, because we want to control when the changes are committed to the database and when the session is flushed. This gives us more control over the transaction and allows us to handle errors more gracefully.
