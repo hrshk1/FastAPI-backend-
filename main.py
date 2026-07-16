@@ -22,7 +22,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins = [
         "http://localhost:3000",
-        # "https://inventory-frontend-yourname.vercel.app" # <-- Add your Vercel URL here later
+        "https://inventorymanager-beta.vercel.app"
     ],
     allow_methods = ["*"],
     allow_headers = ["*"]
