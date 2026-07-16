@@ -247,9 +247,25 @@ function App() {
               onError={() => setError("Login failed")}
             />
           ) : (
-            <button className="btn btn-secondary" onClick={handleLogout}>
-              Logout
-            </button>
+            <>
+              <div className="user-profile">
+                {user.picture && (
+                  <img 
+                    src={user.picture} 
+                    alt="Profile" 
+                    className="profile-pic" 
+                    referrerPolicy="no-referrer" 
+                  />
+                )}
+                <div className="user-info">
+                  <span className="user-welcome">Welcome, {user.name}</span>
+                  <span className="user-email-text">{user.email}</span>
+                </div>
+              </div>
+              <button className="btn btn-secondary" onClick={handleLogout}>
+                Logout
+              </button>
+            </>
           )}
 
           <button
