@@ -4,7 +4,7 @@ import "./App.css";
 import TaglineSection from "./TaglineSection";
 import { GoogleLogin, googleLogout } from "@react-oauth/google";
 const api = axios.create({
-  baseURL: "http://localhost:8000",
+  baseURL: process.env.REACT_APP_API_URL || "http://localhost:8000",
 });
 
 function App() {
